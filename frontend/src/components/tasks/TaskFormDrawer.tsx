@@ -1,31 +1,56 @@
 import { useState } from "react";
 import { X, CalendarDays } from "lucide-react";
+import type { ChangeEvent, FormEvent } from "react";
+import type { TaskInput, TaskStatus, priorityStatus } from "../../types/task";
 
-const emptyForm = {
+const emptyForm: TaskInput = {
   title: "",
   description: "",
   dueDate: "",
   status: "Pending",
+  priority: "Medium",
   assignedTo: "",
 };
 
-export default function TaskFormDrawer({ onClose, onCreate }) {
+interface TaskFormDrawerProps {
+  users: Array<{ id: string; name: string; role: string }>;
+  onClose: () => void;
+  onCreate: (task: TaskInput) => void | Promise<void>;
+}
+
+export default function TaskFormDrawer({ users, onClose, onCreate }: TaskFormDrawerProps) {
 const [form, setForm] = useState(emptyForm);
 const [error, setError] = useState("");
 
-function handleChange(event) {
+function handleChange(
+  event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+) {
 const { name, value } = event.target;
 
-setForm((current) => ({
-  ...current,
-  [name]: value,
-}));
+setForm((current) => {
+  switch (name) {
+    case "title":
+      return { ...current, title: value };
+    case "description":
+      return { ...current, description: value };
+    case "dueDate":
+      return { ...current, dueDate: value };
+    case "status":
+      return { ...current, status: value as TaskStatus };
+    case "priority":
+      return { ...current, priority: value as priorityStatus };
+    case "assignedTo":
+      return { ...current, assignedTo: value };
+    default:
+      return current;
+  }
+});
 
 setError("");
 
 }
 
-function handleSubmit(event) {
+function handleSubmit(event: FormEvent<HTMLFormElement>) {
 event.preventDefault();
 
 if (!form.title.trim()) {
@@ -124,6 +149,20 @@ onMouseDown={(event) => event.stopPropagation()}
       </div>
 
       <div className="form-field">
+        <label htmlFor="task-priority">Priority Status</label>
+        <select
+          id="task-priority"
+          name="priority"
+          value={form.priority}
+          onChange={handleChange}
+        >
+          <option value="">Unassigned</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+        </select>
+      </div>
+      <div className="form-field">
         <label htmlFor="task-assignee">Assign to</label>
         <select
           id="task-assignee"
@@ -132,7 +171,11 @@ onMouseDown={(event) => event.stopPropagation()}
           onChange={handleChange}
         >
           <option value="">Unassigned</option>
-          <option value="Rajvir">Me (Rajvir)</option>
+          {users.map((assignee) => (
+            <option key={assignee.id} value={assignee.id}>
+              {assignee.name} ({assignee.role})
+            </option>
+          ))}
         </select>
       </div>
 

@@ -1,6 +1,11 @@
 import { ArrowLeft, Construction } from "lucide-react";
 
-export default function ComingSoon({ type, onBack }) {
+interface ComingSoonProps {
+  type: "settings" | "help";
+  onBack: () => void;
+}
+
+export default function ComingSoon({ type, onBack }: ComingSoonProps) {
   const title =
     type === "settings" ? "Settings" : "Help & Support";
   const description =

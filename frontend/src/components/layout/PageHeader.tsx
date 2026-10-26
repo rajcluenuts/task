@@ -5,7 +5,11 @@ import {
   CircleHelp,
 } from "lucide-react";
 
-export default function Sidebar({ totalTasks = 0 }) {
+interface SidebarProps {
+  totalTasks?: number;
+}
+
+export default function Sidebar({ totalTasks = 0 }: SidebarProps) {
   return (
     <aside className="sidebar">
       {/* Brand */}
