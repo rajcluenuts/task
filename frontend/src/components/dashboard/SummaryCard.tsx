@@ -3,16 +3,24 @@ import {
   CircleDashed,
   Clock3,
   CheckCircle2,
+  type LucideIcon,
 } from "lucide-react";
+import type { TaskSummaryType } from "../../types/task";
 
-const icons = {
+const icons: Record<TaskSummaryType, LucideIcon> = {
   total: ListTodo,
   pending: CircleDashed,
   inProgress: Clock3,
   completed: CheckCircle2,
 };
 
-export default function SummaryCard({ label, value, type }) {
+interface SummaryCardProps {
+  label: string;
+  value: number;
+  type: TaskSummaryType;
+}
+
+export default function SummaryCard({ label, value, type }: SummaryCardProps) {
   const Icon = icons[type];
 
   return (

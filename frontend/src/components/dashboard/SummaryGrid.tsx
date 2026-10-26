@@ -1,7 +1,8 @@
-import SummaryCard from "./SummaryCard.jsx";
+import SummaryCard from "./SummaryCard";
+import type { Task, TaskSummaryType } from "../../types/task";
 
-export default function SummaryGrid({ tasks }) {
-  const summary = [
+export default function SummaryGrid({ tasks }: { tasks: Task[] }) {
+  const summary: { label: string; value: number; type: TaskSummaryType }[] = [
     {
       label: "Total tasks",
       value: tasks.length,

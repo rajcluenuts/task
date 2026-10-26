@@ -1,7 +1,7 @@
 
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-async function connectDB() {
+async function connectDB(): Promise<void> {
   try {
     const uri = process.env.MONGODB_URI;
 
@@ -15,11 +15,11 @@ async function connectDB() {
 
     console.log("✅ MongoDB connected successfully");
     console.log("Database:", mongoose.connection.name);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("❌ MongoDB connection failed:");
-    console.error(error.message);
+    console.error(error instanceof Error ? error.message : "Unknown error");
     throw error;
   }
 }
 
-module.exports = connectDB;
+export default connectDB;

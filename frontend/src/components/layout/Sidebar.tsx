@@ -5,6 +5,7 @@ import {
   CircleHelp,
   ChevronRight,
   ListTodo,
+  UserRound,
 } from "lucide-react";
 
 const navigationItems = [
@@ -25,6 +26,12 @@ const navigationItems = [
     mobileOnly: true,
   },
   {
+    id: "profile",
+    label: "Profile",
+    icon: UserRound,
+    mobileOnly: true,
+  },
+  {
     id: "settings",
     label: "Settings",
     icon: Settings,
@@ -36,13 +43,26 @@ const navigationItems = [
   },
 ];
 
+type PageId = (typeof navigationItems)[number]["id"];
+
+interface SidebarProps {
+  userName: string;
+  userRole: string;
+  totalTasks?: number;
+  myTaskCount?: number;
+  activePage?: string;
+  onNavigate?: (page: string) => void;
+}
+
 export default function Sidebar({
+  userName,
+  userRole,
   totalTasks = 0,
   myTaskCount = 0,
   activePage = "dashboard",
-  onNavigate = () => {},
-}) {
-  function handleNavigation(event, page) {
+  onNavigate = () => { },
+}: SidebarProps) {
+  function handleNavigation(event: React.MouseEvent<HTMLAnchorElement>, page: PageId) {
     event.preventDefault();
     onNavigate(page);
   }
@@ -76,9 +96,8 @@ export default function Sidebar({
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className={`sidebar-nav-item ${
-                  item.mobileOnly ? "mobile-my-tasks-nav " : ""
-                }${isActive ? "active" : ""}`}
+                className={`sidebar-nav-item ${item.mobileOnly ? "mobile-only-nav " : ""
+                  }${isActive ? "active" : ""}`}
                 aria-current={isActive ? "page" : undefined}
                 onClick={(event) =>
                   handleNavigation(event, item.id)
@@ -116,9 +135,8 @@ export default function Sidebar({
           </div>
 
           <a
-            className={`sidebar-nav-item ${
-              activePage === "my-tasks" ? "active" : ""
-            }`}
+            className={`sidebar-nav-item ${activePage === "my-tasks" ? "active" : ""
+              }`}
             href="#my-tasks"
             onClick={(event) => {
               event.preventDefault();
@@ -153,21 +171,23 @@ export default function Sidebar({
 
           <ChevronRight size={15} className="help-arrow" />
         </button>
+        <button
+          type="button"
+          className="sidebar-help-card"
+          onClick={() => onNavigate("profile")}
+        >
+          <span className="help-icon">
+            <Settings size={17} />
+          </span>
 
-        <div className="sidebar-profile">
-          <div className="profile-avatar">R</div>
+          <span className="help-content">
+            <strong>{userName}</strong>
+            <span>{userRole}</span>
+          </span>
 
-          <div className="profile-details">
-            <strong>Rajvir</strong>
-            <span>Workspace owner</span>
-          </div>
+          <ChevronRight size={15} className="help-arrow" />
+        </button>
 
-          <span
-            className="profile-status"
-            aria-label="Online"
-            title="Online"
-          />
-        </div>
       </div>
     </aside>
   );

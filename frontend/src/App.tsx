@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Task, TaskStatus } from "./types/task";
 import {
   Plus,
   Search,
@@ -14,19 +15,26 @@ import {
   updateTask as saveTaskUpdate,
   deleteTask as removeTask,
 } from "./services/taskService";
+import { getUsers } from "./services/userService";
 
 import Sidebar from "./components/layout/Sidebar";
 import SummaryGrid from "./components/dashboard/SummaryGrid";
 import TaskFormDrawer from "./components/tasks/TaskFormDrawer";
 import ComingSoon from "./components/layout/ComingSoon";
-import LandingPage from "./components/landing/LandingPage";
+import ProfilePage from "./components/layout/ProfilePage";
+import LoginPage from "./components/landing/landingPage";
+import type { AuthUser } from "./types/auth";
 
 import "./App.css";
 
-const taskStatuses = ["Pending", "In Progress", "Completed"];
-const currentUser = "Rajvir";
+const taskStatuses: TaskStatus[] = ["Pending", "In Progress", "Completed"];
 
-function formatDate(date) {
+interface AuthSessionResponse {
+  message?: string;
+  user?: AuthUser;
+}
+
+function formatDate(date: string) {
   if (!date) return "No due date";
 
   return new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
@@ -35,37 +43,131 @@ function formatDate(date) {
   });
 }
 
+function isAssignedToUser(task: Task, user: AuthUser | null) {
+  return task.assignedTo === user?.id || task.assignedTo === user?.name;
+}
+
 export default function App() {
-  const isLandingPage = window.location.pathname === "/landing";
-  const [tasks, setTasks] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [authCheckError, setAuthCheckError] = useState("");
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<AuthUser[]>([]);
+  const [usersError, setUsersError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | "All">("All");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activePage, setActivePage] = useState("dashboard");
   const myTasks = useMemo(
-    () => tasks.filter((task) => task.assignedTo === currentUser),
-    [tasks]
+    () => tasks.filter((task) => isAssignedToUser(task, user)),
+    [tasks, user]
   );
   useEffect(() => {
-    if (isLandingPage) return;
+    let active = true;
+
+    async function checkSession() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        });
+
+        if (response.status === 401) {
+          return;
+        }
+
+        const result = (await response.json()) as AuthSessionResponse;
+        if (!response.ok || !result.user) {
+          throw new Error(result.message || "Unable to verify your session.");
+        }
+
+        if (active) {
+          setUser(result.user);
+        }
+      } catch (error) {
+        if (active) {
+          setAuthCheckError(
+            error instanceof Error ? error.message : "Unable to verify your session."
+          );
+        }
+      } finally {
+        if (active) {
+          setIsCheckingSession(false);
+        }
+      }
+    }
+
+    void checkSession();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!user) {
+      return;
+    }
 
     async function loadTasks() {
       try {
         setApiError("");
+        setIsLoading(true);
         const data = await getTasks();
-        setTasks(data);
+        if (active) {
+          setTasks(data);
+        }
       } catch (error) {
-        setApiError(error.message || "Unable to load tasks.");
+        if (active) {
+          setApiError(error instanceof Error ? error.message : "Unable to load tasks.");
+        }
       } finally {
-        setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+        }
       }
     }
 
-    loadTasks();
-  }, [isLandingPage]);
+    void loadTasks();
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!user) {
+      return;
+    }
+
+    async function loadUsers() {
+      try {
+        setUsersError("");
+        const data = await getUsers();
+        if (active) {
+          setUsers(data);
+        }
+      } catch (error) {
+        if (active) {
+          setUsersError(
+            error instanceof Error ? error.message : "Unable to load users."
+          );
+        }
+      }
+    }
+
+    void loadUsers();
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -84,18 +186,64 @@ export default function App() {
   const pageTasks = useMemo(
     () =>
       activePage === "my-tasks"
-        ? filteredTasks.filter((task) => task.assignedTo === currentUser)
+        ? filteredTasks.filter((task) => isAssignedToUser(task, user))
         : filteredTasks,
-    [activePage, filteredTasks]
+    [activePage, filteredTasks, user]
   );
 
-  function navigateTo(page) {
+  if (isCheckingSession) {
+    return <main className="auth-page min-h-screen p-8">Checking your session...</main>;
+  }
+
+  if (!user) {
+    return (
+      <>
+        {authCheckError && (
+          <p role="alert" className="api-error">
+            {authCheckError}
+          </p>
+        )}
+        <LoginPage
+          onLogin={(signedInUser) => {
+            setAuthCheckError("");
+            setActivePage("dashboard");
+            setUser(signedInUser);
+          }}
+        />
+      </>
+    );
+  }
+
+  function navigateTo(page: string) {
     setActivePage(page);
     setIsDrawerOpen(false);
   }
 
+  async function logout() {
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      const result = (await response.json()) as AuthSessionResponse;
 
-  async function createTask(formData) {
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to sign out.");
+      }
+
+      setApiError("");
+      setActivePage("dashboard");
+      setUser(null);
+      setTasks([]);
+      setUsers([]);
+      setIsLoading(false);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Unable to sign out.");
+    }
+  }
+
+
+  async function createTask(formData: Omit<Task, "id">) {
     try {
       setApiError("");
 
@@ -107,11 +255,11 @@ export default function App() {
       setStatusFilter("All");
       setActivePage("dashboard");
     } catch (error) {
-      setApiError(error.message || "Failed to create task.");
+      setApiError(error instanceof Error ? error.message : "Failed to create task.");
     }
   }
 
-  async function updateTaskStatus(id, status) {
+  async function updateTaskStatus(id: string, status: TaskStatus) {
     try {
       setApiError("");
 
@@ -121,11 +269,11 @@ export default function App() {
         current.map((task) => (task.id === id ? updatedTask : task))
       );
     } catch (error) {
-      setApiError(error.message || "Failed to update task.");
+      setApiError(error instanceof Error ? error.message : "Failed to update task.");
     }
   }
 
-  async function deleteTask(id) {
+  async function deleteTask(id: string) {
     try {
       setApiError("");
 
@@ -133,17 +281,15 @@ export default function App() {
 
       setTasks((current) => current.filter((task) => task.id !== id));
     } catch (error) {
-      setApiError(error.message || "Failed to delete task.");
+      setApiError(error instanceof Error ? error.message : "Failed to delete task.");
     }
-  }
-
-  if (isLandingPage) {
-    return <LandingPage />;
   }
 
   return (
     <div className="app-shell">
       <Sidebar
+        userName={user.name}
+        userRole={user.role}
         totalTasks={tasks.length}
         myTaskCount={myTasks.length}
         activePage={activePage}
@@ -156,6 +302,11 @@ export default function App() {
         {apiError && (
           <p role="alert" className="api-error">
             {apiError}
+          </p>
+        )}
+        {usersError && (
+          <p role="alert" className="api-error">
+            {usersError}
           </p>
         )}
         {(activePage === "dashboard" ||
@@ -250,7 +401,7 @@ export default function App() {
                                       onChange={(event) =>
                                         updateTaskStatus(
                                           task.id,
-                                          event.target.value
+                                          event.target.value as TaskStatus
                                         )
                                       }
                                       aria-label={`Move ${task.title} to another status`}
@@ -333,7 +484,7 @@ export default function App() {
                       <select
                         value={statusFilter}
                         onChange={(event) =>
-                          setStatusFilter(event.target.value)
+                          setStatusFilter(event.target.value as TaskStatus | "All")
                         }
                         aria-label="Filter tasks by status"
                       >
@@ -383,7 +534,7 @@ export default function App() {
                                   }`}
                                 value={task.status}
                                 onChange={(event) =>
-                                  updateTaskStatus(task.id, event.target.value)
+                                  updateTaskStatus(task.id, event.target.value as TaskStatus)
                                 }
                                 aria-label={`Status for ${task.title}`}
                               >
@@ -438,12 +589,23 @@ export default function App() {
             onBack={() => navigateTo("dashboard")}
           />
         )}
+
+        {activePage === "profile" && (
+          <ProfilePage
+            name={user.name}
+            email={user.email}
+            role={user.role}
+            onBack={() => navigateTo("dashboard")}
+            onLogout={logout}
+          />
+        )}
       </main>
 
       {isDrawerOpen &&
         (activePage === "dashboard" ||
           activePage === "all-tasks") && (
           <TaskFormDrawer
+            users={users}
             onClose={() => setIsDrawerOpen(false)}
             onCreate={createTask}
           />
